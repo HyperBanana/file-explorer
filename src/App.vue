@@ -243,17 +243,17 @@ watch(
 </script>
 
 <template>
-    <v-app>
+    <v-app theme="custom">
         <v-main>
             <v-container>
                 <h1 class="text-h4 mb-4">File Explorer</h1>
                 <div class="mb-4">
-                    <v-btn @click="openAddModal(false)" class="mr-2"
+                    <v-btn class="mr-2" @click="openAddModal(false)"
                         >Add File</v-btn
                     >
                     <v-btn @click="openAddModal(true)">Add Folder</v-btn>
                 </div>
-                <div v-if="fileTree">
+                <div v-if="fileTree" class="filetree-container">
                     <v-treeview
                         v-model:open="expandedItems"
                         :items="fileTree"
@@ -274,7 +274,7 @@ watch(
                         </template>
                         <template #append="{ item }">
                             <v-menu>
-                                <template v-slot:activator="{ props }">
+                                <template #activator="{ props }">
                                     <v-btn
                                         icon="mdi-dots-vertical"
                                         variant="text"
@@ -319,10 +319,10 @@ watch(
                         required
                         return-object
                     >
-                        <template v-slot:selection="{ item }">
+                        <template #selection="{ item }">
                             {{ item.title }}
                         </template>
-                        <template v-slot:item="{ props, item }">
+                        <template #item="">
                             <v-treeview
                                 :items="directoriesOnly"
                                 activatable
@@ -362,13 +362,3 @@ watch(
         </v-dialog>
     </v-app>
 </template>
-
-<style scoped>
-.v-treeview-node__root {
-    min-height: 30px;
-}
-.v-select__content {
-    max-height: 300px;
-    overflow-y: auto;
-}
-</style>
