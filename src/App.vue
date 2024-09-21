@@ -1,15 +1,17 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, onMounted, watch, computed, reactive } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 
 const fileTree = ref(null);
-const activeItemId = ref([]);
 const expandedItems = ref([]);
-const showContextMenu = ref(false);
-const contextMenuPosition = ref({ x: 0, y: 0 });
-const contextMenuTarget = ref(null);
+const showAddModal = ref(false);
+const newItemName = ref('');
+const selectedDirectory = ref(null);
+const isAddingFolder = ref(false);
+const expandedModalItems = ref([]);
+const activatedItems = ref([]);
 
-const fileIcons = ref({
+const fileIcons = {
     html: 'mdi-language-html5',
     js: 'mdi-nodejs',
     json: 'mdi-code-json',
@@ -32,10 +34,10 @@ const fileIcons = ref({
     java: 'mdi-language-java',
     css: 'mdi-language-css3',
     svg: 'mdi-svg',
-});
+};
 
 const getFileIcon = (fileExtension) => {
-    return fileIcons.value[fileExtension] || 'mdi-file-outline';
+    return fileIcons[fileExtension] || 'mdi-file-outline';
 };
 
 const getFolderIcon = (item) => {
@@ -109,92 +111,80 @@ const sortItems = (items) => {
     });
 };
 
-const handleContextMenu = (event, item) => {
-    event.preventDefault();
-    event.stopPropagation();
-    activeItemId.value = item.id;
-    showContextMenu.value = false;
-    const rect = event.target.getBoundingClientRect();
-    contextMenuPosition.value = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-    };
-    contextMenuTarget.value = item;
-    showContextMenu.value = true;
-};
-
-const closeContextMenu = () => {
-    showContextMenu.value = false;
-};
-
-const addItem = (isFolder) => {
-    const clickedItem = contextMenuTarget.value;
-
-    const findParent = (tree, targetId) => {
-        for (let item of tree) {
-            if (item.id === targetId) {
-                return tree;
-            }
+const directoriesOnly = computed(() => {
+    const filterDirectories = (items) => {
+        return items.reduce((acc, item) => {
             if (item.children) {
-                const result = findParent(item.children, targetId);
-                if (result) return result;
+                const newItem = reactive({ ...item });
+                newItem.children = filterDirectories(item.children);
+                acc.push(newItem);
             }
-        }
-        return null;
+            return acc;
+        }, []);
     };
 
-    const parentChildren =
-        clickedItem.children || findParent(fileTree.value, clickedItem.id);
-
-    if (!parentChildren) {
-        console.error("Couldn't find parent");
-        return;
+    if (fileTree.value) {
+        const filteredTree = filterDirectories(fileTree.value);
+        return reactive([
+            {
+                id: 'root',
+                title: 'Root',
+                children: filteredTree,
+            },
+        ]);
+    } else {
+        return [];
     }
+});
 
-    const newItemName = prompt(`Enter ${isFolder ? 'folder' : 'file'} name:`);
-    if (!newItemName) return;
-
-    if (parentChildren.some((item) => item.title === newItemName)) {
-        alert('An item with that name already exists in this directory');
-        return;
-    }
+const addItem = () => {
+    if (!newItemName.value) return;
 
     const newItem = {
         id: uuidv4(),
-        title: newItemName,
+        title: newItemName.value,
     };
 
-    if (isFolder) {
+    if (isAddingFolder.value) {
         newItem.children = [];
     } else {
-        const extensionMatch = newItemName.match(/\.([0-9a-z]+)$/i);
+        const extensionMatch = newItemName.value.match(/\.([0-9a-z]+)$/i);
         newItem.file = extensionMatch ? extensionMatch[1].toLowerCase() : null;
     }
 
-    parentChildren.push(newItem);
-    sortItems(parentChildren);
+    const addToDirectory = (tree, dirId) => {
+        if (dirId === 'root') {
+            tree.push(newItem);
+            sortItems(tree);
+            return true;
+        }
+        for (let item of tree) {
+            if (item.id === dirId) {
+                if (!item.children) item.children = [];
+                item.children.push(newItem);
+                sortItems(item.children);
+                return true;
+            }
+            if (item.children && addToDirectory(item.children, dirId)) {
+                return true;
+            }
+        }
+        return false;
+    };
 
-    // Expand the folder if a new item is added
-    if (clickedItem.children) {
-        if (!expandedItems.value.includes(clickedItem.id)) {
-            expandedItems.value.push(clickedItem.id);
-        }
+    if (selectedDirectory.value.id === 'root') {
+        addToDirectory(fileTree.value, 'root');
     } else {
-        // If we're adding to a file's parent, expand the parent folder
-        const parentFolder = fileTree.value.find(
-            (item) => item.children === parentChildren
-        );
-        if (parentFolder && !expandedItems.value.includes(parentFolder.id)) {
-            expandedItems.value.push(parentFolder.id);
-        }
+        addToDirectory(fileTree.value, selectedDirectory.value.id);
     }
 
-    closeContextMenu();
+    showAddModal.value = false;
+    newItemName.value = '';
+    selectedDirectory.value = null;
+    activatedItems.value = [];
 };
 
 const deleteItem = (item) => {
-    if (!item) return;
-
     const deleteFromTree = (tree, id) => {
         for (let i = 0; i < tree.length; i++) {
             if (tree[i].id === id) {
@@ -214,33 +204,39 @@ const deleteItem = (item) => {
     };
 
     deleteFromTree(fileTree.value, item.id);
-    closeContextMenu();
 };
 
-const handleKeyDown = (event) => {
-    if (event.key === 'Delete' && activeItemId.value.length > 0) {
-        const item = fileTree.value.find(
-            ({ id }) => id === activeItemId.value[0]
-        );
-        deleteItem(item);
+const openAddModal = (isFolder) => {
+    isAddingFolder.value = isFolder;
+    showAddModal.value = true;
+    // Expand all folders in the modal treeview
+    expandedModalItems.value = [
+        'root',
+        ...directoriesOnly.value[0].children.map((item) => item.id),
+    ];
+    activatedItems.value = [];
+    selectedDirectory.value = null;
+};
+
+const handleSelection = (items) => {
+    const item = items[0];
+    if (item) {
+        selectedDirectory.value = item;
+    } else {
+        selectedDirectory.value = null;
     }
 };
 
 onMounted(() => {
     fetchFileTree();
-    window.addEventListener('click', closeContextMenu);
-    window.addEventListener('keydown', handleKeyDown);
-});
-
-onUnmounted(() => {
-    window.removeEventListener('click', closeContextMenu);
-    window.removeEventListener('keydown', handleKeyDown);
 });
 
 watch(
     fileTree,
     () => {
-        localStorage.setItem('fileTree', JSON.stringify(fileTree.value));
+        if (fileTree.value) {
+            localStorage.setItem('fileTree', JSON.stringify(fileTree.value));
+        }
     },
     { deep: true }
 );
@@ -251,24 +247,24 @@ watch(
         <v-main>
             <v-container>
                 <h1 class="text-h4 mb-4">File Explorer</h1>
+                <div class="mb-4">
+                    <v-btn @click="openAddModal(false)" class="mr-2"
+                        >Add File</v-btn
+                    >
+                    <v-btn @click="openAddModal(true)">Add Folder</v-btn>
+                </div>
                 <div v-if="fileTree">
                     <v-treeview
-                        v-model:activated="activeItemId"
                         v-model:open="expandedItems"
                         :items="fileTree"
                         item-title="title"
                         item-children="children"
                         item-value="id"
-                        activatable
                         open-on-click
                         density="compact"
                     >
                         <template #prepend="{ item }">
-                            <v-icon
-                                @contextmenu.prevent.stop="
-                                    handleContextMenu($event, item)
-                                "
-                            >
+                            <v-icon>
                                 {{
                                     item.children
                                         ? getFolderIcon(item)
@@ -277,12 +273,23 @@ watch(
                             </v-icon>
                         </template>
                         <template #append="{ item }">
-                            <div
-                                class="item-overlay"
-                                @contextmenu.prevent.stop="
-                                    handleContextMenu($event, item)
-                                "
-                            ></div>
+                            <v-menu>
+                                <template v-slot:activator="{ props }">
+                                    <v-btn
+                                        icon="mdi-dots-vertical"
+                                        variant="text"
+                                        v-bind="props"
+                                        size="small"
+                                    ></v-btn>
+                                </template>
+                                <v-list>
+                                    <v-list-item @click="deleteItem(item)">
+                                        <v-list-item-title
+                                            >Delete</v-list-item-title
+                                        >
+                                    </v-list-item>
+                                </v-list>
+                            </v-menu>
                         </template>
                     </v-treeview>
                 </div>
@@ -290,29 +297,69 @@ watch(
             </v-container>
         </v-main>
 
-        <v-menu
-            v-model="showContextMenu"
-            :position-x="contextMenuPosition.x"
-            :position-y="contextMenuPosition.y"
-            absolute
-            :close-on-content-click="false"
-            @click:outside="closeContextMenu"
-        >
-            <v-list>
-                <v-list-item @click="addItem(true)">
-                    <v-list-item-title>Add Folder</v-list-item-title>
-                </v-list-item>
-                <v-list-item @click="addItem(false)">
-                    <v-list-item-title>Add File</v-list-item-title>
-                </v-list-item>
-                <v-list-item
-                    v-if="contextMenuTarget"
-                    @click="deleteItem(contextMenuTarget)"
-                >
-                    <v-list-item-title>Delete</v-list-item-title>
-                </v-list-item>
-            </v-list>
-        </v-menu>
+        <v-dialog v-model="showAddModal" max-width="500px">
+            <v-card>
+                <v-card-title>
+                    <span class="text-h5"
+                        >Add {{ isAddingFolder ? 'Folder' : 'File' }}</span
+                    >
+                </v-card-title>
+                <v-card-text>
+                    <v-text-field
+                        v-model="newItemName"
+                        :label="isAddingFolder ? 'Folder Name' : 'File Name'"
+                        required
+                    ></v-text-field>
+                    <v-select
+                        v-model="selectedDirectory"
+                        :items="directoriesOnly"
+                        item-title="title"
+                        item-value="id"
+                        label="Select Directory"
+                        required
+                        return-object
+                    >
+                        <template v-slot:selection="{ item }">
+                            {{ item.title }}
+                        </template>
+                        <template v-slot:item="{ props, item }">
+                            <v-treeview
+                                :items="directoriesOnly"
+                                activatable
+                                density="compact"
+                                item-children="children"
+                                return-object
+                                open-all
+                                @update:activated="handleSelection"
+                            >
+                                <template #prepend="{ item }">
+                                    <v-icon>
+                                        {{ getFolderIcon(item) }}
+                                    </v-icon>
+                                </template>
+                            </v-treeview>
+                        </template>
+                    </v-select>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn
+                        color="blue-darken-1"
+                        variant="text"
+                        @click="showAddModal = false"
+                    >
+                        Cancel
+                    </v-btn>
+                    <v-btn
+                        color="blue-darken-1"
+                        variant="text"
+                        @click="addItem"
+                    >
+                        Add
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </v-app>
 </template>
 
@@ -320,13 +367,8 @@ watch(
 .v-treeview-node__root {
     min-height: 30px;
 }
-
-.v-list-item__overlay {
-    position: relative;
-}
-
-.item-overlay {
-    position: absolute;
-    inset: 0;
+.v-select__content {
+    max-height: 300px;
+    overflow-y: auto;
 }
 </style>
