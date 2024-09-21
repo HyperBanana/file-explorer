@@ -1,7 +1,8 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 
 const fileTree = ref(null);
+const activeItem = ref([]);
 
 const fileIcons = ref({
     html: 'mdi-language-html5',
@@ -34,11 +35,17 @@ const getFileIcon = (fileExtension) => {
 
 const fetchFileTree = async () => {
     try {
-        const response = await fetch(
-            'https://ab-file-explorer.athleticnext.workers.dev/?file=regular'
-        );
-        const data = await response.json();
-        fileTree.value = processFileTree(data);
+        const storedTree = localStorage.getItem('fileTree');
+        if (storedTree) {
+            fileTree.value = JSON.parse(storedTree);
+        } else {
+            const response = await fetch(
+                'https://ab-file-explorer.athleticnext.workers.dev/?file=regular'
+            );
+            const data = await response.json();
+            fileTree.value = processFileTree(data);
+            localStorage.setItem('fileTree', JSON.stringify(fileTree.value));
+        }
     } catch (error) {
         console.error('Error fetching file tree:', error);
     }
@@ -89,9 +96,47 @@ const processFileTree = (data) => {
     return tree;
 };
 
+const handleKeyDown = (event) => {
+    if (event.key === 'Delete' && activeItem.value.length > 0) {
+        deleteItem(activeItem.value[0]);
+    }
+};
+
+const deleteItem = (itemId) => {
+    const deleteFromTree = (tree, id) => {
+        for (let i = 0; i < tree.length; i++) {
+            if (tree[i].id === id) {
+                tree.splice(i, 1);
+                return true;
+            }
+            if (tree[i].children) {
+                if (deleteFromTree(tree[i].children, id)) {
+                    if (tree[i].children.length === 0) {
+                        delete tree[i].children;
+                    }
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    deleteFromTree(fileTree.value, itemId);
+    activeItem.value = [];
+};
+
 onMounted(() => {
     fetchFileTree();
+    window.addEventListener('keydown', handleKeyDown);
 });
+
+watch(
+    fileTree,
+    () => {
+        localStorage.setItem('fileTree', JSON.stringify(fileTree.value));
+    },
+    { deep: true }
+);
 </script>
 
 <template>
@@ -101,12 +146,14 @@ onMounted(() => {
                 <h1 class="text-h4 mb-4">File Explorer</h1>
                 <div v-if="fileTree">
                     <v-treeview
+                        v-model:activated="activeItem"
                         :items="fileTree"
                         item-title="title"
                         item-children="children"
-                        open-on-click
+                        item-value="id"
+                        activatable
                     >
-                        <template v-slot:prepend="{ item }">
+                        <template #prepend="{ item }">
                             <v-icon v-if="item.children">
                                 {{
                                     item.children.length > 0
@@ -118,7 +165,7 @@ onMounted(() => {
                                 {{ getFileIcon(item.file) }}
                             </v-icon>
                         </template>
-                        <template v-slot:label="{ item }">
+                        <template #label="{ item }">
                             {{ item.title }}
                             <span v-if="item.file" class="text-caption ml-2"
                                 >({{ item.file }})</span
