@@ -1,23 +1,36 @@
-<template>
-    <div class="file-explorer">
-        <h1>File Explorer</h1>
-        <div v-if="fileTree">
-            <TreeView
-                :node="fileTree"
-                @toggle="toggleFolder"
-                @remove="removeItem"
-                @add="addItem"
-            />
-        </div>
-        <div v-else>Loading...</div>
-    </div>
-</template>
-
 <script setup>
-import { ref, onMounted, watch } from 'vue';
-import TreeView from './components/TreeView.vue';
+import { ref, onMounted } from 'vue';
 
 const fileTree = ref(null);
+
+const fileIcons = ref({
+    html: 'mdi-language-html5',
+    js: 'mdi-nodejs',
+    json: 'mdi-code-json',
+    md: 'mdi-language-markdown',
+    pdf: 'mdi-file-pdf-box',
+    png: 'mdi-file-image',
+    jpg: 'mdi-file-image',
+    jpeg: 'mdi-file-image',
+    gif: 'mdi-file-image',
+    txt: 'mdi-file-document-outline',
+    xls: 'mdi-file-excel',
+    xlsx: 'mdi-file-excel',
+    doc: 'mdi-file-word',
+    docx: 'mdi-file-word',
+    ppt: 'mdi-file-powerpoint',
+    pptx: 'mdi-file-powerpoint',
+    py: 'mdi-language-python',
+    cpp: 'mdi-language-cpp',
+    cs: 'mdi-language-csharp',
+    java: 'mdi-language-java',
+    css: 'mdi-language-css3',
+    svg: 'mdi-svg',
+});
+
+const getFileIcon = (fileExtension) => {
+    return fileIcons.value[fileExtension] || 'mdi-file-outline';
+};
 
 const fetchFileTree = async () => {
     try {
@@ -32,92 +45,95 @@ const fetchFileTree = async () => {
 };
 
 const processFileTree = (data) => {
-    const root = {
-        name: data.name,
-        children: [],
-        isFolder: true,
-        isExpanded: true,
-    };
-    const paths = data.filepaths;
+    const tree = [];
 
-    paths.forEach((path) => {
+    data.filepaths.forEach((path) => {
         const parts = path.split('/');
-        let currentNode = root;
+        let currentLevel = tree;
 
         parts.forEach((part, index) => {
-            let child = currentNode.children.find((c) => c.name === part);
-            if (!child) {
-                child = {
-                    name: part,
-                    children: [],
-                    isFolder: index < parts.length - 1,
-                    isExpanded: false,
+            let existingPath = currentLevel.find((p) => p.title === part);
+            if (!existingPath) {
+                existingPath = {
+                    id: `node-${path}-${index}`,
+                    title: part,
                 };
-                currentNode.children.push(child);
+
+                if (index === parts.length - 1) {
+                    // It's a file
+                    const extensionMatch = part.match(/\.([0-9a-z]+)$/i);
+                    existingPath.file = extensionMatch
+                        ? extensionMatch[1].toLowerCase()
+                        : null;
+                } else {
+                    // It's a folder
+                    existingPath.children = [];
+                }
+
+                currentLevel.push(existingPath);
+
+                // Sort the current level
+                currentLevel.sort((a, b) => {
+                    if (a.children && !b.children) return -1; // Folders first
+                    if (!a.children && b.children) return 1; // Files last
+                    return a.title.localeCompare(b.title); // Alphabetical within each group
+                });
             }
-            currentNode = child;
+
+            if (index < parts.length - 1) {
+                currentLevel = existingPath.children;
+            }
         });
     });
 
-    return root;
+    return tree;
 };
-
-const toggleFolder = (node) => {
-    node.isExpanded = !node.isExpanded;
-};
-
-const removeNodeRecursively = (parent, nodeToRemove) => {
-    const index = parent.children.findIndex((child) => child === nodeToRemove);
-    if (index !== -1) {
-        parent.children.splice(index, 1);
-    } else {
-        parent.children.forEach((child) => {
-            if (child.isFolder) {
-                removeNodeRecursively(child, nodeToRemove);
-            }
-        });
-    }
-};
-
-const removeItem = (node) => {
-    removeNodeRecursively(fileTree.value, node);
-};
-
-const addItem = ({ parent, name, isFolder }) => {
-    const newNode = {
-        name,
-        isFolder,
-        children: [],
-        isExpanded: false,
-    };
-    parent.children.push(newNode);
-};
-
-const saveState = () => {
-    localStorage.setItem('fileExplorerState', JSON.stringify(fileTree.value));
-};
-
-const loadState = () => {
-    const savedState = localStorage.getItem('fileExplorerState');
-    if (savedState) {
-        fileTree.value = JSON.parse(savedState);
-    } else {
-        fetchFileTree();
-    }
-};
-
-watch(fileTree, saveState, { deep: true });
 
 onMounted(() => {
-    loadState();
+    fetchFileTree();
 });
 </script>
 
+<template>
+    <v-app>
+        <v-main>
+            <v-container>
+                <h1 class="text-h4 mb-4">File Explorer</h1>
+                <div v-if="fileTree">
+                    <v-treeview
+                        :items="fileTree"
+                        item-title="title"
+                        item-children="children"
+                        open-on-click
+                    >
+                        <template v-slot:prepend="{ item }">
+                            <v-icon v-if="item.children">
+                                {{
+                                    item.children.length > 0
+                                        ? 'mdi-folder-open'
+                                        : 'mdi-folder'
+                                }}
+                            </v-icon>
+                            <v-icon v-else>
+                                {{ getFileIcon(item.file) }}
+                            </v-icon>
+                        </template>
+                        <template v-slot:label="{ item }">
+                            {{ item.title }}
+                            <span v-if="item.file" class="text-caption ml-2"
+                                >({{ item.file }})</span
+                            >
+                        </template>
+                    </v-treeview>
+                </div>
+                <div v-else>Loading...</div>
+            </v-container>
+        </v-main>
+    </v-app>
+</template>
+
 <style scoped>
-.file-explorer {
-    font-family: Arial, sans-serif;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
+.v-treeview-node__root {
+    min-height: 30px;
 }
 </style>
