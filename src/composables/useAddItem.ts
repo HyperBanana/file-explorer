@@ -8,9 +8,8 @@ export function useAddItem(fileTree: Ref<FileTreeItem[] | null>) {
     const newItemName = ref('');
     const selectedDirectory = ref<FileTreeItem | null>(null);
     const isAddingFolder = ref(false);
-    const expandedModalItems = ref<string[]>([]);
     const activatedItems = ref<string[]>([]);
-    const { directories, sortItems } = useFileTree();
+    const { sortItems } = useFileTree();
 
     const addItem = () => {
         if (!newItemName.value || !selectedDirectory.value || !fileTree.value)
@@ -68,13 +67,6 @@ export function useAddItem(fileTree: Ref<FileTreeItem[] | null>) {
     const openAddModal = (isFolder: boolean) => {
         isAddingFolder.value = isFolder;
         showAddModal.value = true;
-
-        const rootChildren = directories.value[0]?.children || [];
-        expandedModalItems.value = [
-            'root',
-            ...rootChildren.map((item: FileTreeItem) => item.id),
-        ];
-
         activatedItems.value = [];
         selectedDirectory.value = null;
     };
@@ -93,7 +85,6 @@ export function useAddItem(fileTree: Ref<FileTreeItem[] | null>) {
         newItemName,
         selectedDirectory,
         isAddingFolder,
-        expandedModalItems,
         activatedItems,
         addItem,
         openAddModal,

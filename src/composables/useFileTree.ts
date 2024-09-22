@@ -97,13 +97,11 @@ export function useFileTree() {
                     };
 
                     if (index === parts.length - 1) {
-                        // It's a file
                         const extensionMatch = part.match(/\.([0-9a-z]+)$/i);
                         existingPath.file = extensionMatch
                             ? extensionMatch[1].toLowerCase()
                             : null;
                     } else {
-                        // It's a folder
                         existingPath.children = [];
                     }
 
@@ -151,11 +149,6 @@ export function useFileTree() {
             deleteFromTree(fileTree.value, item.id);
         }
     };
-
-    watch(fileTree, () => {
-        // This will trigger a recomputation of the directories computed property
-        // You can add additional logic here if needed
-    });
 
     return {
         fileTree,

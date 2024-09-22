@@ -8,15 +8,10 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    (e: 'update:expandedItems', value: string[]): void;
     (e: 'deleteItem', item: FileTreeItem): void;
 }>();
 
 const { getFileIcon, getFolderIcon } = useFileTree();
-
-const updateExpanded = (value: string[]) => {
-    emit('update:expandedItems', value);
-};
 </script>
 
 <template>
@@ -28,7 +23,6 @@ const updateExpanded = (value: string[]) => {
         item-value="id"
         open-on-click
         density="compact"
-        @update:open="updateExpanded"
     >
         <template #prepend="{ item }">
             <v-icon>

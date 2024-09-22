@@ -13,7 +13,6 @@ const {
     newItemName,
     selectedDirectory,
     isAddingFolder,
-    expandedModalItems,
     activatedItems,
     addItem,
     openAddModal,
@@ -36,7 +35,7 @@ watch(
     { deep: true }
 );
 
-const handleAddItem = (isFolder: boolean) => {
+const handleAddItem = (isFolder: boolean = false) => {
     showAddMenu.value = false;
     openAddModal(isFolder);
 };
@@ -56,7 +55,7 @@ const handleAddItem = (isFolder: boolean) => {
                             </v-btn>
                         </template>
                         <v-list>
-                            <v-list-item @click="handleAddItem(false)">
+                            <v-list-item @click="handleAddItem()">
                                 <v-list-item-title>Add File</v-list-item-title>
                             </v-list-item>
                             <v-list-item @click="handleAddItem(true)">
@@ -68,7 +67,7 @@ const handleAddItem = (isFolder: boolean) => {
                     </v-menu>
                 </div>
                 <div v-if="fileTree" class="filetree-container">
-                    <FileTree
+                    <file-tree
                         :items="fileTree"
                         :expanded-items="expandedItems"
                         @update:expanded-items="expandedItems = $event"
@@ -79,12 +78,11 @@ const handleAddItem = (isFolder: boolean) => {
             </v-container>
         </v-main>
 
-        <AddItemModal
+        <add-item-modal
             v-model="showAddModal"
             v-model:new-item-name="newItemName"
             v-model:selected-directory="selectedDirectory"
             :directories="directories"
-            :expanded-modal-items="expandedModalItems"
             :activated-items="activatedItems"
             :is-adding-folder="isAddingFolder"
             @add-item="addItem"

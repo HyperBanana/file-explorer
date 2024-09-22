@@ -6,9 +6,8 @@ const props = defineProps<{
     modelValue: boolean;
     newItemName: string;
     selectedDirectory: FileTreeItem | null;
-    // isAddingFolder: boolean;
+    isAddingFolder: boolean;
     directories: FileTreeItem[];
-    expandedModalItems: string[];
     activatedItems: string[];
 }>();
 

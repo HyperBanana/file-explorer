@@ -14,11 +14,6 @@ export default [
                 node: 'readonly',
             },
         },
-        rules: {
-            // You can add your custom rules here, for example:
-            // 'vue/no-unused-vars': 'error'
-        },
-        // This applies these settings to both .js and .vue files
         files: ['**/*.js', '**/*.vue'],
     },
 ];
