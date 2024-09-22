@@ -49,7 +49,7 @@ const updateExpanded = (value: string[]) => {
                         size="small"
                     ></v-btn>
                 </template>
-                <v-list>
+                <v-list class="item-menu">
                     <v-list-item @click="$emit('deleteItem', item)">
                         <v-list-item-title>Delete</v-list-item-title>
                     </v-list-item>

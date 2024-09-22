@@ -47,7 +47,15 @@ body {
         display: flex;
     }
 
-    .v-list {
-        min-width: 320px;
+    .v-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .v-card {
+        max-width: 480px;
+        width: 100%;
+        margin-inline: auto;
     }
 }
